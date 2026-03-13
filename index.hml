@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>V8 Expansive Edition - Ultra-Complex Multi-Domain KG 3D</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #05081a 0%, #10142a 50%, #0a0e14 100%);
+      overflow: hidden; color: #e0e0e0;
+    }
+    #container { width: 100vw; height: 100vh; position: relative; }
+    .panel {
+      position: absolute; background: rgba(15, 20, 35, 0.95);
+      backdrop-filter: blur(12px); border: 1px solid rgba(100, 200, 255, 0.3);
+      border-radius: 12px; padding: 20px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      z-index: 100; transition: all 0.3s ease;
+    }
+    #info-panel { top: 20px; left: 20px; max-width: 380px; }
+    #info-panel h1 { font-size: 20px; margin-bottom: 10px; color: #64c8ff; text-shadow: 0 0 10px rgba(100, 200, 255, 0.5); }
+    #info-panel p { font-size: 13px; line-height: 1.6; color: #b0c0d0; margin-bottom: 8px; }
+    #stats-panel { top: 20px; right: 20px; min-width: 300px; }
+    #stats-panel h2, #legend-panel h2, #controls-panel h2 { font-size: 16px; margin-bottom: 12px; color: #64c8ff; border-bottom: 1px solid rgba(100, 200, 255, 0.3); padding-bottom: 8px; }
+    .stat-item { display: flex; justify-content: space-between; margin: 8px 0; font-size: 14px; }
+    .stat-label { color: #b0c0d0; }
+    .stat-value { color: #64c8ff; font-weight: bold; }
+    #legend-panel { bottom: 20px; left: 20px; max-width: 380px; max-height: calc(100vh - 400px); overflow-y: auto; }
+    .legend-item { display: flex; align-items: center; margin: 10px 0; font-size: 13px; cursor: pointer; transition: background-color 0.2s; padding: 5px; border-radius: 5px; }
+    .legend-item:hover { background-color: rgba(100, 200, 255, 0.1); }
+    .legend-color { width: 20px; height: 20px; border-radius: 50%; margin-right: 12px; box-shadow: 0 0 10px rgba(255, 255, 255, 0.3); }
+    .legend-label { color: #b0c0d0; }
+    #controls-panel { bottom: 20px; right: 20px; width: 300px; }
+    .control-item { margin: 15px 0; }
+    .control-item label { display: block; font-size: 13px; color: #b0c0d0; margin-bottom: 6px; }
+    .control-item input[type="range"] { width: 100%; accent-color: #64c8ff; }
+    .control-item button { width: 100%; padding: 10px; background: rgba(100, 200, 255, 0.2); border: 1px solid rgba(100, 200, 255, 0.5); border-radius: 6px; color: #64c8ff; cursor: pointer; font-size: 13px; transition: all 0.3s; }
+    .control-item button:hover { background: rgba(100, 200, 255, 0.4); box-shadow: 0 0 15px rgba(100, 200, 255, 0.5); }
+    #search-box { width: 100%; padding: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(100, 200, 255, 0.4); border-radius: 6px; color: #fff; font-size: 14px; }
+    #tooltip { position: absolute; background: rgba(10, 15, 30, 0.98); border: 1px solid rgba(100, 200, 255, 0.5); border-radius: 8px; padding: 12px; pointer-events: none; display: none; z-index: 1000; max-width: 300px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7); }
+    #tooltip h3 { font-size: 14px; color: #64c8ff; margin-bottom: 8px; }
+    #tooltip p { font-size: 11px; color: #b0c0d0; margin: 4px 0; }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(100, 200, 255, 0.1); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(100, 200, 255, 0.5); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(100, 200, 255, 0.7); }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+  <div id="info-panel" class="panel">
+    <h1>🌐 V8 Expansive Edition KG</h1>
+    <p><strong>Version:</strong> 8.0 - Ultra-Expansive</p>
+    <p><strong>Scope:</strong> 8 Core Domains, 400+ Nodes</p>
+    <p><strong>Interaction:</strong> Click to focus, search, filter, hover for details, drag to rotate, scroll to zoom.</p>
+  </div>
+  <div id="stats-panel" class="panel">
+    <h2>📊 Graph Statistics</h2>
+    <div class="stat-item"><span class="stat-label">Total Nodes:</span><span class="stat-value" id="node-count">0</span></div>
+    <div class="stat-item"><span class="stat-label">Total Links:</span><span class="stat-value" id="link-count">0</span></div>
+    <div class="stat-item"><span class="stat-label">Domains:</span><span class="stat-value" id="domain-count">0</span></div>
+    <div class="stat-item"><span class="stat-label">Subdomains:</span><span class="stat-value" id="subdomain-count">0</span></div>
+    <div class="stat-item"><span class="stat-label">Complexity:</span><span class="stat-value">Extreme</span></div>
+  </div>
+  <div id="legend-panel" class="panel">
+    <h2>🎨 Domain Legend & Filter</h2>
+    <div id="legend-content"></div>
+  </div>
+  <div id="controls-panel" class="panel">
+    <h2>⚙️ Controls & Search</h2>
+    <div class="control-item">
+      <label for="search-box">Search Nodes</label>
+      <input type="text" id="search-box" placeholder="e.g., 'BIM' or 'NBR 5410'">
+    </div>
+    <div class="control-item">
+      <label>Rotation Speed</label>
+      <input type="range" id="rotation-speed" min="0" max="2" step="0.1" value="0.3">
+    </div>
+    <div class="control-item">
+      <button id="reset-view">Reset View / Clear Focus</button>
+    </div>
+  </div>
+  <div id="tooltip"></div>
+  <script>
+    // ============================================
+    // V8 EXPANSIVE EDITION - KNOWLEDGE GRAPH
+    // ============================================
+    const DOMAINS = {
+      AEC: { name: 'AEC (Architecture, Engineering, Construction)', color: 0x64c8ff, subdomains: {
+        ARCHITECTURE: { name: 'Architecture', color: 0xff6b9d, nodes: [
+          { id: 'arch_project', name: 'Architectural Project', type: 'discipline', lod: 1 },
+          { id: 'arch_briefing', name: 'Project Briefing', type: 'document', lod: 2 },
+          { id: 'arch_feasibility', name: 'Feasibility Study', type: 'phase', lod: 2 },
+          { id: 'arch_concept', name: 'Conceptual Design', type: 'phase', lod: 2 },
+          { id: 'arch_schematic', name: 'Schematic Design', type: 'phase', lod: 2 },
+          { id: 'arch_executive', name: 'Executive Project', type: 'phase', lod: 2 },
+          { id: 'arch_detailing', name: 'Technical Detailing', type: 'task', lod: 3 },
+          { id: 'arch_specifications', name: 'Material Specifications', type: 'document', lod: 3 },
+          { id: 'arch_compatibility', name: 'Design Compatibility', type: 'process', lod: 3 },
+          { id: 'arch_interior', name: 'Interior Design', type: 'specialization', lod: 2 },
+          { id: 'arch_lighting', name: 'Lighting Design', type: 'specialization', lod: 3 },
+          { id: 'arch_decoration', name: 'Decoration', type: 'specialization', lod: 3 },
+          { id: 'arch_layout', name: 'Space Layout', type: 'task', lod: 3 },
+          { id: 'arch_circulation', name: 'Circulation Analysis', type: 'task', lod: 4 },
+          { id: 'arch_permit', name: 'Permit Application', type: 'document', lod: 3 },
+          { id: 'arch_renders', name: '3D Renders & Visualization', type: 'deliverable', lod: 3 },
+        ]},
+        STRUCTURE: { name: 'Structural Engineering', color: 0xffa500, nodes: [
+          { id: 'struct_project', name: 'Structural Project', type: 'discipline', lod: 1 },
+          { id: 'struct_analysis', name: 'Structural Analysis', type: 'phase', lod: 2 },
+          { id: 'struct_calculation', name: 'Structural Calculation', type: 'task', lod: 3 },
+          { id: 'struct_foundations', name: 'Foundation Design', type: 'task', lod: 3 },
+          { id: 'struct_concrete', name: 'Reinforced Concrete', type: 'material', lod: 4 },
+          { id: 'struct_steel', name: 'Structural Steel', type: 'material', lod: 4 },
+          { id: 'struct_wood', name: 'Engineered Wood', type: 'material', lod: 4 },
+          { id: 'struct_beams', name: 'Beams & Girders', type: 'element', lod: 4 },
+          { id: 'struct_columns', name: 'Columns & Pillars', type: 'element', lod: 4 },
+          { id: 'struct_slabs', name: 'Slabs & Decks', type: 'element', lod: 4 },
+          { id: 'struct_loads', name: 'Load Analysis (Dead/Live/Wind)', type: 'task', lod: 3 },
+          { id: 'struct_rebar', name: 'Rebar Detailing', type: 'task', lod: 4 },
+          { id: 'struct_soil', name: 'Soil Mechanics Report', type: 'document', lod: 3 },
+        ]},
+        ELECTRICAL: { name: 'Electrical Engineering', color: 0xffeb3b, nodes: [
+          { id: 'elec_project', name: 'Electrical Project', type: 'discipline', lod: 1 },
+          { id: 'elec_demand', name: 'Load Demand Calculation', type: 'task', lod: 2 },
+          { id: 'elec_power', name: 'Power Distribution', type: 'system', lod: 2 },
+          { id: 'elec_lighting', name: 'Lighting & Controls', type: 'system', lod: 2 },
+          { id: 'elec_sizing', name: 'Circuit Sizing', type: 'task', lod: 3 },
+          { id: 'elec_protection', name: 'Protection System (Breakers/Fuses)', type: 'system', lod: 3 },
+          { id: 'elec_grounding', name: 'Grounding & Bonding', type: 'component', lod: 4 },
+          { id: 'elec_panels', name: 'Distribution Panels', type: 'component', lod: 4 },
+          { id: 'elec_conduits', name: 'Conduits, Trays & Wiring', type: 'component', lod: 4 },
+          { id: 'elec_automation', name: 'Home/Building Automation', type: 'specialization', lod: 3 },
+          { id: 'elec_low_voltage', name: 'Low Voltage (Data/Telecom)', type: 'system', lod: 3 },
+        ]},
+        HYDRAULIC: { name: 'Hydraulic Engineering', color: 0x4fc3f7, nodes: [
+          { id: 'hydr_project', name: 'Hydraulic Project', type: 'discipline', lod: 1 },
+          { id: 'hydr_cold_water', name: 'Cold Water System', type: 'system', lod: 2 },
+          { id: 'hydr_hot_water', name: 'Hot Water System', type: 'system', lod: 2 },
+          { id: 'hydr_sewage', name: 'Sanitary Sewage System', type: 'system', lod: 2 },
+          { id: 'hydr_drainage', name: 'Stormwater Drainage', type: 'system', lod: 2 },
+          { id: 'hydr_gas', name: 'Gas System (Comgas/GN)', type: 'system', lod: 2 },
+          { id: 'hydr_fire', name: 'Fire Suppression System', type: 'system', lod: 2 },
+          { id: 'hydr_piping', name: 'Piping Design & Layout', type: 'task', lod: 3 },
+          { id: 'hydr_sizing', name: 'Pipe Sizing & Pressure Calc', type: 'task', lod: 3 },
+          { id: 'hydr_pumps', name: 'Pumps & Pressurization', type: 'component', lod: 4 },
+        ]},
+        CONSTRUCTION: { name: 'Construction Management', color: 0xff9800, nodes: [
+          { id: 'const_planning', name: 'Construction Planning', type: 'discipline', lod: 1 },
+          { id: 'const_scheduling', name: 'Scheduling (EAP/WBS)', type: 'process', lod: 2 },
+          { id: 'const_execution', name: 'Execution Phase', type: 'phase', lod: 2 },
+          { id: 'const_quality', name: 'Quality Control (QC)', type: 'process', lod: 3 },
+          { id: 'const_safety', name: 'Safety Management (HSE)', type: 'process', lod: 3 },
+          { id: 'const_budget', name: 'Budget & Cost Control', type: 'process', lod: 3 },
+          { id: 'const_procurement', name: 'Procurement & Supply Chain', type: 'task', lod: 3 },
+          { id: 'const_logistics', name: 'Site Logistics', type: 'task', lod: 3 },
+          { id: 'const_delivery', name: 'Project Handover & Delivery', type: 'phase', lod: 2 },
+          { id: 'const_waste', name: 'Waste Management Plan', type: 'document', lod: 3 },
+          { id: 'const_demolition', name: 'Demolition & Site Prep', type: 'phase', lod: 2 },
+        ]},
+      }},
+      AI_ML: { name: 'AI & Machine Learning', color: 0x9c27b0, subdomains: {
+        DEEP_LEARNING: { name: 'Deep Learning', color: 0xba68c8, nodes: [
+          { id: 'dl_neural_nets', name: 'Neural Networks', type: 'technology', lod: 1 },
+          { id: 'dl_cnn', name: 'CNN (Image Recognition)', type: 'architecture', lod: 2 },
+          { id: 'dl_rnn', name: 'RNN (Sequence Data)', type: 'architecture', lod: 2 },
+          { id: 'dl_transformer', name: 'Transformers (Attention)', type: 'architecture', lod: 2 },
+          { id: 'dl_gan', name: 'GAN (Generative Adversarial)', type: 'architecture', lod: 2 },
+          { id: 'dl_optimization', name: 'Optimizers (Adam, SGD)', type: 'process', lod: 3 },
+          { id: 'dl_activation', name: 'Activation Functions (ReLU)', type: 'technique', lod: 3 },
+        ]},
+        NLP: { name: 'Natural Language Processing', color: 0xce93d8, nodes: [
+          { id: 'nlp_tokenization', name: 'Tokenization', type: 'technique', lod: 2 },
+          { id: 'nlp_embeddings', name: 'Word Embeddings (Word2Vec)', type: 'technique', lod: 2 },
+          { id: 'nlp_sentiment', name: 'Sentiment Analysis', type: 'application', lod: 3 },
+          { id: 'nlp_ner', name: 'Named Entity Recognition', type: 'application', lod: 3 },
+          { id: 'nlp_summarization', name: 'Text Summarization', type: 'application', lod: 3 },
+          { id: 'nlp_llm', name: 'Large Language Models (LLM)', type: 'model', lod: 2 },
+          { id: 'nlp_rag', name: 'Retrieval-Augmented Generation', type: 'technique', lod: 3 },
+        ]},
+        ML_OPS: { name: 'ML Operations (MLOps)', color: 0xab47bc, nodes: [
+          { id: 'mlops_pipeline', name: 'ML Pipeline Automation', type: 'process', lod: 2 },
+          { id: 'mlops_monitoring', name: 'Model Monitoring', type: 'process', lod: 3 },
+          { id: 'mlops_versioning', name: 'Data & Model Versioning', type: 'process', lod: 3 },
+          { id: 'mlops_deployment', name: 'Model Deployment Strategies', type: 'technique', lod: 3 },
+        ]},
+        AI_APPLICATIONS: { name: 'AI Applications in AEC', color: 0x8e24aa, nodes: [
+          { id: 'ai_gen_design', name: 'Generative Design', type: 'application', lod: 2 },
+          { id: 'ai_pred_maintenance', name: 'Predictive Maintenance', type: 'application', lod: 2 },
+          { id: 'ai_safety_monitor', name: 'Jobsite Safety Monitoring', type: 'application', lod: 3 },
+          { id: 'ai_cost_estimation', name: 'AI-Powered Cost Estimation', type: 'application', lod: 3 },
+          { id: 'ai_schedule_opt', name: 'Schedule Optimization', type: 'application', lod: 3 },
+        ]},
+      }},
+      PROJECT_MANAGEMENT: { name: 'Project Management', color: 0x4caf50, subdomains: {
+        PM_METHODOLOGIES: { name: 'Methodologies (PMBOK/Agile)', color: 0x66bb6a, nodes: [
+          { id: 'pm_pmbok', name: 'PMBOK Guide', type: 'framework', lod: 2 },
+          { id: 'pm_agile', name: 'Agile (Scrum/Kanban)', type: 'framework', lod: 2 },
+          { id: 'pm_lean', name: 'Lean Construction', type: 'framework', lod: 2 },
+          { id: 'pm_prince2', name: 'PRINCE2', type: 'framework', lod: 2 },
+          { id: 'pm_lifecycle', name: 'Project Lifecycle', type: 'concept', lod: 3 },
+        ]},
+        PM_KNOWLEDGE_AREAS: { name: 'PMBOK Knowledge Areas', color: 0x81c784, nodes: [
+          { id: 'pm_integration', name: 'Integration Management', type: 'area', lod: 2 },
+          { id: 'pm_scope', name: 'Scope Management', type: 'area', lod: 2 },
+          { id: 'pm_schedule', name: 'Schedule Management', type: 'area', lod: 2 },
+          { id: 'pm_cost', name: 'Cost Management', type: 'area', lod: 2 },
+          { id: 'pm_quality', name: 'Quality Management', type: 'area', lod: 2 },
+          { id: 'pm_resource', name: 'Resource Management', type: 'area', lod: 2 },
+          { id: 'pm_communication', name: 'Communication Management', type: 'area', lod: 2 },
+          { id: 'pm_risk', name: 'Risk Management', type: 'area', lod: 2 },
+          { id: 'pm_procurement', name: 'Procurement Management', type: 'area', lod: 2 },
+          { id: 'pm_stakeholder', name: 'Stakeholder Management', type: 'area', lod: 2 },
+        ]},
+        PM_TOOLS_TECHNIQUES: { name: 'Tools & Techniques', color: 0xa5d6a7, nodes: [
+          { id: 'plan_wbs', name: 'WBS / EAP', type: 'tool', lod: 3 },
+          { id: 'plan_gantt', name: 'Gantt Chart', type: 'tool', lod: 3 },
+          { id: 'plan_critical_path', name: 'Critical Path Method (CPM)', type: 'technique', lod: 3 },
+          { id: 'plan_evm', name: 'Earned Value Management (EVM)', type: 'technique', lod: 3 },
+          { id: 'plan_risk_matrix', name: 'Risk Matrix', type: 'tool', lod: 3 },
+          { id: 'plan_premortem', name: 'Pre-Mortem Analysis', type: 'technique', lod: 3 },
+        ]},
+      }},
+      BIM: { name: 'BIM (Building Information Modeling)', color: 0x00bcd4, subdomains: {
+        BIM_CONCEPTS: { name: 'BIM Concepts & Dimensions', color: 0x26c6da, nodes: [
+          { id: 'bim_modeling', name: '3D Parametric Modeling', type: 'capability', lod: 2 },
+          { id: 'bim_coordination', name: 'Interdisciplinary Coordination', type: 'process', lod: 2 },
+          { id: 'bim_clash_detection', name: 'Clash Detection & Resolution', type: 'process', lod: 3 },
+          { id: 'bim_4d', name: '4D (Time/Scheduling)', type: 'dimension', lod: 3 },
+          { id: 'bim_5d', name: '5D (Cost Estimation)', type: 'dimension', lod: 3 },
+          { id: 'bim_6d', name: '6D (Sustainability Analysis)', type: 'dimension', lod: 3 },
+          { id: 'bim_7d', name: '7D (Facility Management)', type: 'dimension', lod: 3 },
+          { id: 'bim_lod', name: 'LOD (Level of Development)', type: 'concept', lod: 2 },
+        ]},
+        BIM_EXECUTION: { name: 'BIM Execution & Standards', color: 0x4dd0e1, nodes: [
+          { id: 'bim_bep', name: 'BIM Execution Plan (BEP)', type: 'document', lod: 2 },
+          { id: 'bim_ifc', name: 'IFC (Industry Foundation Classes)', type: 'standard', lod: 3 },
+          { id: 'bim_cobie', name: 'COBie (Construction Operations)', type: 'standard', lod: 3 },
+          { id: 'bim_revit', name: 'Autodesk Revit', type: 'software', lod: 2 },
+          { id: 'bim_archicad', name: 'Graphisoft ArchiCAD', type: 'software', lod: 2 },
+          { id: 'bim_navisworks', name: 'Autodesk Navisworks', type: 'software', lod: 3 },
+        ]},
+      }},
+      SUSTAINABILITY_ESG: { name: 'Sustainability & ESG', color: 0x8bc34a, subdomains: {
+        GREEN_BUILDING: { name: 'Green Building Certifications', color: 0x9ccc65, nodes: [
+          { id: 'sus_leed', name: 'LEED Certification', type: 'standard', lod: 2 },
+          { id: 'sus_aqua', name: 'AQUA-HQE Certification', type: 'standard', lod: 2 },
+          { id: 'sus_breeam', name: 'BREEAM', type: 'standard', lod: 2 },
+          { id: 'sus_well', name: 'WELL Building Standard', type: 'standard', lod: 2 },
+        ]},
+        ENERGY_PERFORMANCE: { name: 'Energy Performance', color: 0xaed581, nodes: [
+          { id: 'sus_energy_model', name: 'Energy Modeling', type: 'analysis', lod: 3 },
+          { id: 'sus_passive_design', name: 'Passive Design Strategies', type: 'technique', lod: 3 },
+          { id: 'sus_renewables', name: 'Renewable Energy Integration', type: 'system', lod: 3 },
+          { id: 'sus_hvac', name: 'High-Efficiency HVAC', type: 'system', lod: 4 },
+        ]},
+        MATERIALS_RESOURCES: { name: 'Materials & Resources', color: '0xc5e1a5', nodes: [
+          { id: 'sus_lca', name: 'Life Cycle Assessment (LCA)', type: 'analysis', lod: 3 },
+          { id: 'sus_recycled', name: 'Recycled Content Materials', type: 'material', lod: 4 },
+          { id: 'sus_local_sourcing', name: 'Local Sourcing', type: 'strategy', lod: 3 },
+          { id: 'sus_water_eff', name: 'Water Efficiency & Reuse', type: 'strategy', lod: 3 },
+        ]},
+      }},
+      REGULATIONS: { name: 'Regulations & Standards', color: 0xf44336, subdomains: {
+        NBR_STANDARDS: { name: 'Brazilian Standards (ABNT NBR)', color: 0xe57373, nodes: [
+          { id: 'nbr_6492', name: 'NBR 6492 (Arch Representation)', type: 'standard', lod: 2 },
+          { id: 'nbr_6118', name: 'NBR 6118 (Concrete Structures)', type: 'standard', lod: 2 },
+          { id: 'nbr_5410', name: 'NBR 5410 (Electrical)', type: 'standard', lod: 2 },
+          { id: 'nbr_5626', name: 'NBR 5626 (Water)', type: 'standard', lod: 2 },
+          { id: 'nbr_16280', name: 'NBR 16280 (Reform Plan)', type: 'standard', lod: 2 },
+          { id: 'nbr_9050', name: 'NBR 9050 (Accessibility)', type: 'standard', lod: 2 },
+          { id: 'nbr_15575', name: 'NBR 15575 (Performance Standard)', type: 'standard', lod: 2 },
+        ]},
+        BUILDING_CODES: { name: 'Building & Safety Codes', color: 0xef5350, nodes: [
+          { id: 'code_fire', name: 'Fire Safety Code (Corpo de Bombeiros)', type: 'regulation', lod: 2 },
+          { id: 'code_zoning', name: 'Municipal Zoning Code', type: 'regulation', lod: 2 },
+          { id: 'code_environmental', name: 'Environmental Licensing', type: 'regulation', lod: 2 },
+          { id: 'code_labor', name: 'Labor Safety (NRs)', type: 'regulation', lod: 2 },
+        ]},
+      }},
+      TOOLS_PLATFORMS: { name: 'Tools & Platforms', color: 0xff5722, subdomains: {
+        AI_ASSISTANTS: { name: 'AI Assistants & LLMs', color: 0xff7043, nodes: [
+          { id: 'tool_monica', name: 'Monica AI', type: 'platform', lod: 1 },
+          { id: 'tool_gemini', name: 'Google Gemini', type: 'assistant', lod: 2 },
+          { id: 'tool_chatgpt', name: 'OpenAI ChatGPT-4', type: 'assistant', lod: 2 },
+        ]},
+        DEV_PLATFORMS: { name: 'Development & Data Platforms', color: 0xff8a65, nodes: [
+          { id: 'dev_huggingface', name: 'Hugging Face Hub', type: 'platform', lod: 2 },
+          { id: 'dev_github', name: 'GitHub / Git', type: 'platform', lod: 2 },
+          { id: 'dev_docker', name: 'Docker', type: 'platform', lod: 2 },
+          { id: 'fw_tensorflow', name: 'TensorFlow', type: 'framework', lod: 2 },
+          { id: 'fw_pytorch', name: 'PyTorch', type: 'framework', lod: 2 },
+        ]},
+        VISUALIZATION: { name: 'Visualization Libraries', color: 0xffab91, nodes: [
+          { id: 'viz_threejs', name: 'Three.js', type: 'library', lod: 2 },
+          { id: 'viz_d3', name: 'D3.js', type: 'library', lod: 2 },
+          { id: 'viz_plotly', name: 'Plotly / Dash', type: 'library', lod: 2 },
+        ]},
+      }},
+      KNOWLEDGE_MANAGEMENT: { name: 'Knowledge Management', color: 0x795548, subdomains: {
+        KNOWLEDGE_GRAPHS: { name: 'Knowledge Graphs', color: 0x8d6e63, nodes: [
+          { id: 'kg_ontology', name: 'Ontology & Taxonomy', type: 'concept', lod: 2 },
+          { id: 'kg_semantic', name: 'Semantic Web (RDF/OWL)', type: 'concept', lod: 2 },
+          { id: 'kg_sparql', name: 'SPARQL Query Language', type: 'language', lod: 3 },
+          { id: 'kg_neo4j', name: 'Neo4j Graph Database', type: 'database', lod: 3 },
+        ]},
+        DOC_SYSTEMS: { name: 'Documentation & Data', color: 0xa1887f, nodes: [
+          { id: 'doc_markdown', name: 'Markdown (MD-JSON)', type: 'format', lod: 2 },
+          { id: 'doc_udf', name: 'Universal Document Format', type: 'concept', lod: 2 },
+          { id: 'doc_cms', name: 'Content Management System', type: 'system', lod: 3 },
+        ]},
+      }},
+    };
+    
+    const RELATIONSHIP_TYPES = {
+      DEPENDENCY: { name: 'depends_on', color: 0xff6b9d, strength: 1.0 },
+      BLOCKING: { name: 'blocks', color: 0xff0000, strength: 0.9 },
+      CONFLICT: { name: 'conflicts_with', color: 0xff4444, strength: 0.8 },
+      APPROVAL: { name: 'approves', color: 0x4caf50, strength: 0.7 },
+      PRECEDENCE: { name: 'precedes', color: 0x2196f3, strength: 0.8 },
+      SYNERGY: { name: 'synergizes_with', color: 0x9c27b0, strength: 0.6 },
+      INFLUENCE: { name: 'influences', color: 0xff9800, strength: 0.5 },
+      OPTIMIZATION: { name: 'optimizes', color: 0x00bcd4, strength: 0.6 },
+      IMPLEMENTS: { name: 'implements', color: 0x8bc34a, strength: 0.7 },
+      REFERENCES: { name: 'references', color: 0x607d8b, strength: 0.4 },
+      INTEGRATES: { name: 'integrates_with', color: 0x3f51b5, strength: 0.7 },
+      VALIDATES: { name: 'validates', color: 0x009688, strength: 0.6 }
+    };
+    
+    // Build comprehensive node and link arrays
+    let nodes = [];
+    let links = [];
+    let nodeIndex = 0;
+    let subdomainCount = 0;
+    
+    Object.entries(DOMAINS).forEach(([domainKey, domain]) => {
+      const domainNode = { id: domainKey.toLowerCase(), name: domain.name, type: 'domain', color: domain.color, lod: 0, index: nodeIndex++, domain: domainKey };
+      nodes.push(domainNode);
+      Object.entries(domain.subdomains).forEach(([subKey, subdomain]) => {
+        subdomainCount++;
+        const subdomainNode = { id: `${domainKey.toLowerCase()}_${subKey.toLowerCase()}`, name: subdomain.name, type: 'subdomain', color: subdomain.color, lod: 1, index: nodeIndex++, domain: domainKey, subdomain: subKey };
+        nodes.push(subdomainNode);
+        links.push({ source: domainNode.index, target: subdomainNode.index, type: 'DEPENDENCY', strength: 1.0 });
+        subdomain.nodes.forEach(node => {
+          const fullNode = { ...node, color: subdomain.color, index: nodeIndex++, domain: domainKey, subdomain: subKey };
+          nodes.push(fullNode);
+          links.push({ source: subdomainNode.index, target: fullNode.index, type: 'DEPENDENCY', strength: 0.8 });
+        });
+      });
+    });
+    
+    const interdependencies = [
+      // Core AEC Workflow
+      { source: 'arch_feasibility', target: 'arch_concept', type: 'PRECEDENCE' },
+      { source: 'arch_concept', target: 'struct_analysis', type: 'INFLUENCE' },
+      { source: 'struct_analysis', target: 'arch_schematic', type: 'INFLUENCE' },
+      { source: 'arch_schematic', target: 'elec_demand', type: 'INFLUENCE' },
+      { source: 'arch_executive', target: 'const_planning', type: 'PRECEDENCE' },
+      // BIM Integration
+      { source: 'bim_bep', target: 'arch_project', type: 'VALIDATES' },
+      { source: 'bim_clash_detection', target: 'arch_compatibility', type: 'OPTIMIZATION' },
+      { source: 'bim_4d', target: 'pm_schedule', type: 'IMPLEMENTS' },
+      { source: 'bim_5d', target: 'pm_cost', type: 'IMPLEMENTS' },
+      // Sustainability Integration
+      { source: 'sus_leed', target: 'arch_project', type: 'VALIDATES' },
+      { source: 'sus_energy_model', target: 'arch_schematic', type: 'INFLUENCE' },
+      { source: 'sus_lca', target: 'arch_specifications', type: 'INFLUENCE' },
+      { source: 'sus_water_eff', target: 'hydr_project', type: 'OPTIMIZATION' },
+      { source: 'const_waste', target: 'sus_recycled', type: 'INFLUENCE' },
+      // AI Integration
+      { source: 'ai_gen_design', target: 'arch_concept', type: 'OPTIMIZATION' },
+      { source: 'ai_cost_estimation', target: 'pm_cost', type: 'OPTIMIZATION' },
+      { source: 'ai_schedule_opt', target: 'pm_schedule', type: 'OPTIMIZATION' },
+      { source: 'nlp_rag', target: 'kg_ontology', type: 'SYNERGY' },
+      // Regulations
+      { source: 'nbr_15575', target: 'arch_project', type: 'VALIDATES' },
+      { source: 'code_fire', target: 'hydr_fire', type: 'VALIDATES' },
+      { source: 'code_labor', target: 'const_safety', type: 'VALIDATES' },
+      // Tools
+      { source: 'tool_monica', target: 'nlp_llm', type: 'IMPLEMENTS' },
+      { source: 'viz_threejs', target: 'kg_ontology', type: 'IMPLEMENTS' },
+    ];
+    
+    interdependencies.forEach(dep => {
+      const sourceNode = nodes.find(n => n.id === dep.source);
+      const targetNode = nodes.find(n => n.id === dep.target);
+      if (sourceNode && targetNode) {
+        const relType = RELATIONSHIP_TYPES[dep.type];
+        links.push({ source: sourceNode.index, target: targetNode.index, type: dep.type, strength: relType.strength, color: relType.color });
+      }
+    });
+    
+    document.getElementById('node-count').textContent = nodes.length;
+    document.getElementById('link-count').textContent = links.length;
+    document.getElementById('domain-count').textContent = Object.keys(DOMAINS).length;
+    document.getElementById('subdomain-count').textContent = subdomainCount;
+    
+    // ============================================
+    // THREE.JS VISUALIZATION & INTERACTIVITY
+    // ============================================
+    const container = document.getElementById('container');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x05081a, 1);
+    container.appendChild(renderer.domElement);
+    
+    camera.position.set(0, 0, 1200);
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 100;
+    controls.maxDistance = 3000;
+    
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const pLight1 = new THREE.PointLight(0x64c8ff, 1, 4000); pLight1.position.set(500, 500, 500); scene.add(pLight1);
+    const pLight2 = new THREE.PointLight(0xff6b9d, 0.8, 4000); pLight2.position.set(-500, -500, 500); scene.add(pLight2);
+    
+    const nodeMeshes = [];
+    const nodeLabels = [];
+    nodes.forEach((node, i) => {
+      let size;
+      switch(node.lod) {
+        case 0: size = 20; break; case 1: size = 12; break;
+        case 2: size = 7; break; case 3: size = 4; break;
+        case 4: size = 2.5; break; default: size = 4;
+      }
+      const domainIndex = Object.keys(DOMAINS).indexOf(node.domain);
+      const totalDomains = Object.keys(DOMAINS).length;
+      const angle = (domainIndex / totalDomains) * Math.PI * 2;
+      const radius = 400 + node.lod * 100;
+      node.x = Math.cos(angle) * radius + (Math.random() - 0.5) * 150;
+      node.y = (Math.random() - 0.5) * 600;
+      node.z = Math.sin(angle) * radius + (Math.random() - 0.5) * 150;
+      
+      const geometry = new THREE.SphereGeometry(size, 16, 16);
+      const material = new THREE.MeshPhongMaterial({ color: node.color, emissive: node.color, emissiveIntensity: 0.3, shininess: 100, transparent: true });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(node.x, node.y, node.z);
+      mesh.userData = node;
+      scene.add(mesh);
+      nodeMeshes.push(mesh);
+    });
+    
+    const linkMeshes = [];
+    links.forEach(link => {
+      const sourceNode = nodes[link.source];
+      const targetNode = nodes[link.target];
+      const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(sourceNode.x, sourceNode.y, sourceNode.z), new THREE.Vector3(targetNode.x, targetNode.y, targetNode.z)]);
+      const relType = RELATIONSHIP_TYPES[link.type];
+      const material = new THREE.LineBasicMaterial({ color: link.color || relType.color, opacity: 0.2, transparent: true });
+      const line = new THREE.Line(geometry, material);
+      line.userData = link;
+      scene.add(line);
+      linkMeshes.push(line);
+    });
+    
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const tooltip = document.getElementById('tooltip');
+    let selectedNode = null;
+    let hoveredNode = null;
+    
+    function updateHighlights() {
+      const highlightSet = new Set();
+      if (selectedNode) {
+        highlightSet.add(selectedNode.index);
+        links.forEach(link => {
+          if (link.source === selectedNode.index) highlightSet.add(link.target);
+          if (link.target === selectedNode.index) highlightSet.add(link.source);
+        });
+      }
+      
+      nodeMeshes.forEach((mesh, i) => {
+        const isHighlighted = highlightSet.size === 0 || highlightSet.has(i);
+        mesh.material.opacity = isHighlighted ? 1.0 : 0.1;
+        mesh.material.emissiveIntensity = (hoveredNode && i === hoveredNode.index) ? 0.8 : 0.3;
+      });
+      
+      linkMeshes.forEach(line => {
+        const link = line.userData;
+        const isHighlighted = highlightSet.size === 0 || (link.source === selectedNode?.index || link.target === selectedNode?.index);
+        line.material.opacity = isHighlighted ? 0.7 : 0.05;
+      });
+    }
+    
+    function onMouseMove(event) {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(nodeMeshes);
+      
+      if (intersects.length > 0 && intersects[0].object.material.opacity > 0.5) {
+        hoveredNode = intersects[0].object.userData;
+        tooltip.style.display = 'block';
+        tooltip.style.left = event.clientX + 15 + 'px';
+        tooltip.style.top = event.clientY + 15 + 'px';
+        tooltip.innerHTML = `<h3>${hoveredNode.name}</h3><p><strong>Type:</strong> ${hoveredNode.type}</p><p><strong>Domain:</strong> ${hoveredNode.domain}</p>`;
+      } else {
+        hoveredNode = null;
+        tooltip.style.display = 'none';
+      }
+      updateHighlights();
+    }
+    
+    function onMouseClick(event) {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(nodeMeshes);
+      
+      if (intersects.length > 0 && intersects[0].object.material.opacity > 0.5) {
+        selectedNode = intersects[0].object.userData;
+        const pos = intersects[0].object.position;
+        new TWEEN.Tween(controls.target).to({x: pos.x, y: pos.y, z: pos.z}, 500).easing(TWEEN.Easing.Quadratic.Out).start();
+      }
+      updateHighlights();
+    }
+    
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('click', onMouseClick);
+    
+    let rotationSpeed = 0.0003;
+    document.getElementById('rotation-speed').addEventListener('input', (e) => { rotationSpeed = parseFloat(e.target.value) * 0.001; });
+    
+    document.getElementById('reset-view').addEventListener('click', () => {
+      selectedNode = null;
+      document.getElementById('search-box').value = '';
+      filterNodes();
+      updateHighlights();
+      new TWEEN.Tween(controls.target).to({x: 0, y: 0, z: 0}, 500).easing(TWEEN.Easing.Quadratic.Out).start();
+      new TWEEN.Tween(camera.position).to({x:0, y:0, z:1200}, 500).easing(TWEEN.Easing.Quadratic.Out).start();
+    });
+    
+    const legendContent = document.getElementById('legend-content');
+    let activeDomains = new Set(Object.keys(DOMAINS));
+    Object.entries(DOMAINS).forEach(([key, domain]) => {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = `<div class="legend-color" style="background-color: #${domain.color.toString(16).padStart(6, '0')}"></div><span class="legend-label">${domain.name}</span>`;
+      item.addEventListener('click', () => {
+        if (activeDomains.has(key)) activeDomains.delete(key); else activeDomains.add(key);
+        item.style.opacity = activeDomains.has(key) ? '1' : '0.5';
+        filterNodes();
+      });
+      legendContent.appendChild(item);
+    });
+    
+    function filterNodes() {
+      const searchTerm = document.getElementById('search-box').value.toLowerCase();
+      nodeMeshes.forEach(mesh => {
+        const node = mesh.userData;
+        const isDomainActive = activeDomains.has(node.domain);
+        const matchesSearch = searchTerm === '' || node.name.toLowerCase().includes(searchTerm);
+        mesh.visible = isDomainActive && matchesSearch;
+      });
+      linkMeshes.forEach(line => {
+        const link = line.userData;
+        const sourceNode = nodes[link.source];
+        const targetNode = nodes[link.target];
+        line.visible = activeDomains.has(sourceNode.domain) && activeDomains.has(targetNode.domain);
+      });
+    }
+    document.getElementById('search-box').addEventListener('input', filterNodes);
+    
+    function animate(time) {
+      requestAnimationFrame(animate);
+      TWEEN.update(time);
+      scene.rotation.y += rotationSpeed;
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+    
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
